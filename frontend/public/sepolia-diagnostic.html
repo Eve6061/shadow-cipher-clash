@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sepolia FHEVM Diagnostic</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { 
+            color: #7c3aed; 
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        h2 {
+            color: #a78bfa;
+            margin: 30px 0 15px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #7c3aed;
+            padding-bottom: 10px;
+        }
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status.success { background: rgba(34, 197, 94, 0.15); border-left: 4px solid #22c55e; }
+        .status.error { background: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; }
+        .status.warning { background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; }
+        .status.info { background: rgba(59, 130, 246, 0.15); border-left: 4px solid #3b82f6; }
+        .status.loading { background: rgba(168, 85, 247, 0.15); border-left: 4px solid #a855f7; }
+        .icon {
+            font-size: 1.5rem;
+            min-width: 30px;
+            text-align: center;
+        }
+        button {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 8px 8px 8px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+        button:active { transform: translateY(0); }
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+        pre {
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            color: #c9d1d9;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border: 1px solid #30363d;
+        }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            margin: 8px 0;
+        }
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .badge.pass { background: #22c55e; color: white; }
+        .badge.fail { background: #ef4444; color: white; }
+        .badge.pending { background: #64748b; color: white; }
+        .progress {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #7c3aed, #a855f7);
+            transition: width 0.3s ease;
+        }
+        .metric {
+            display: inline-block;
+            background: rgba(124, 58, 237, 0.2);
+            padding: 4px 10px;
+            border-radius: 6px;
+            margin: 4px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Sepolia FHEVM Diagnostic Tool</h1>
+        <p class="subtitle">Diagnose RelayerSDK and FHEVM connectivity issues</p>
+
+        <div class="card">
+            <h2>Quick Actions</h2>
+            <button onclick="runFullDiagnostic()">🚀 Run Full Diagnostic</button>
+            <button onclick="testCDN()">🌐 Test CDN Only</button>
+            <button onclick="loadSDK()">📦 Load SDK</button>
+            <button onclick="initSDK()" id="initBtn" disabled>⚡ Initialize SDK</button>
+            <button onclick="location.reload()">🔄 Refresh Page</button>
+        </div>
+
+        <div class="card">
+            <h2>Diagnostic Progress</h2>
+            <div class="progress">
+                <div class="progress-bar" id="progress" style="width: 0%"></div>
+            </div>
+            <div id="currentTest" style="color: #94a3b8; margin-top: 10px;">Ready to start...</div>
+        </div>
+
+        <div class="card">
+            <h2>Test Results</h2>
+            <div id="tests"></div>
+        </div>
+
+        <div class="card">
+            <h2>System Information</h2>
+            <div id="sysinfo"></div>
+        </div>
+
+        <div class="card">
+            <h2>Detailed Logs</h2>
+            <pre id="logs">No logs yet. Click "Run Full Diagnostic" to start.</pre>
+        </div>
+    </div>
+
+    <script>
+        const SDK_URL = 'https://cdn.zama.ai/relayer-sdk-js/0.2.0/relayer-sdk-js.umd.cjs';
+        let logs = [];
+        let testResults = {};
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            logs.push(logMessage);
+            document.getElementById('logs').textContent = logs.join('\n');
+            console.log(logMessage);
+        }
+
+        function updateProgress(percent, text) {
+            document.getElementById('progress').style.width = percent + '%';
+            document.getElementById('currentTest').textContent = text;
+        }
+
+        function addTestResult(name, status, details) {
+            testResults[name] = { status, details };
+            updateTestDisplay();
+        }
+
+        function updateTestDisplay() {
+            const testsDiv = document.getElementById('tests');
+            testsDiv.innerHTML = Object.entries(testResults).map(([name, result]) => {
+                const badge = result.status === 'pass' ? 'pass' : result.status === 'fail' ? 'fail' : 'pending';
+                const icon = result.status === 'pass' ? '✅' : result.status === 'fail' ? '❌' : '⏳';
+                return `
+                    <div class="test-item">
+                        <div>${icon} ${name}</div>
+                        <div>
+                            <span class="badge ${badge}">${result.status.toUpperCase()}</span>
+                            ${result.details ? `<span class="metric">${result.details}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function testCDN() {
+            log('Testing CDN connectivity...');
+            updateProgress(10, 'Testing CDN...');
+            
+            try {
+                const start = Date.now();
+                const response = await fetch(SDK_URL, { method: 'HEAD' });
+                const duration = Date.now() - start;
+                
+                if (response.ok) {
+                    const size = response.headers.get('content-length');
+                    log(`✅ CDN accessible! Status: ${response.status}, Size: ${size} bytes, Time: ${duration}ms`);
+                    addTestResult('CDN Connectivity', 'pass', `${duration}ms`);
+                    updateProgress(20, 'CDN test passed');
+                    return true;
+                } else {
+                    log(`❌ CDN returned status: ${response.status}`);
+                    addTestResult('CDN Connectivity', 'fail', `Status ${response.status}`);
+                    return false;
+                }
+            } catch (error) {
+                log(`❌ CDN test failed: ${error.message}`);
+                addTestResult('CDN Connectivity', 'fail', error.message);
+                return false;
+            }
+        }
+
+        async function loadSDK() {
+            log('Loading RelayerSDK from CDN...');
+            updateProgress(30, 'Loading SDK...');
+
+            if ('relayerSDK' in window) {
+                log('SDK already loaded');
+                addTestResult('SDK Loading', 'pass', 'Already loaded');
+                document.getElementById('initBtn').disabled = false;
+                return true;
+            }
+
+            const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
+            if (existingScript) {
+                log('Script tag already exists, checking window...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                if ('relayerSDK' in window) {
+                    addTestResult('SDK Loading', 'pass', 'Loaded');
+                    document.getElementById('initBtn').disabled = false;
+                    return true;
+                }
+            }
+
+            return new Promise((resolve) => {
+                const script = document.createElement('script');
+                script.src = SDK_URL;
+                script.type = 'text/javascript';
+                script.async = true;
+
+                script.onload = () => {
+                    log('✅ Script loaded from CDN');
+                    setTimeout(() => {
+                        if ('relayerSDK' in window && window.relayerSDK) {
+                            log('✅ RelayerSDK object found in window');
+                            addTestResult('SDK Loading', 'pass', 'Loaded successfully');
+                            document.getElementById('initBtn').disabled = false;
+                            updateProgress(50, 'SDK loaded');
+                            resolve(true);
+                        } else {
+                            log('❌ Script loaded but relayerSDK not in window');
+                            addTestResult('SDK Loading', 'fail', 'Not in window');
+                            resolve(false);
+                        }
+                    }, 500);
+                };
+
+                script.onerror = (error) => {
+                    log(`❌ Script load failed: ${error}`);
+                    addTestResult('SDK Loading', 'fail', 'Load error');
+                    resolve(false);
+                };
+
+                log('Adding script to DOM...');
+                document.head.appendChild(script);
+            });
+        }
+
+        async function initSDK() {
+            if (!window.relayerSDK) {
+                log('❌ Cannot initialize: RelayerSDK not loaded');
+                return false;
+            }
+
+            log('Initializing SDK...');
+            updateProgress(60, 'Initializing SDK...');
+
+            try {
+                const result = await window.relayerSDK.initSDK();
+                log(`✅ SDK initialized: ${result}`);
+                addTestResult('SDK Initialization', 'pass', 'Initialized');
+                updateProgress(80, 'SDK initialized');
+                
+                // Check config
+                if (window.relayerSDK.SepoliaConfig) {
+                    log('✅ SepoliaConfig available');
+                    log('Config: ' + JSON.stringify(window.relayerSDK.SepoliaConfig, null, 2));
+                    addTestResult('Sepolia Config', 'pass', 'Available');
+                }
+                
+                return true;
+            } catch (error) {
+                log(`❌ SDK initialization failed: ${error.message}`);
+                addTestResult('SDK Initialization', 'fail', error.message);
+                return false;
+            }
+        }
+
+        async function checkSystemInfo() {
+            log('Collecting system information...');
+            
+            const info = {
+                'User Agent': navigator.userAgent,
+                'Platform': navigator.platform,
+                'Language': navigator.language,
+                'Online': navigator.onLine,
+                'Cookies Enabled': navigator.cookieEnabled,
+                'Screen Resolution': `${screen.width}x${screen.height}`,
+                'Window Size': `${window.innerWidth}x${window.innerHeight}`,
+            };
+
+            // Check MetaMask
+            if (window.ethereum) {
+                try {
+                    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                    info['MetaMask Chain ID'] = parseInt(chainId, 16);
+                    info['MetaMask'] = '✅ Detected';
+                    
+                    if (info['MetaMask Chain ID'] === 11155111) {
+                        info['Network'] = '✅ Sepolia';
+                    } else if (info['MetaMask Chain ID'] === 31337) {
+                        info['Network'] = '⚠️ Hardhat Local (should switch to Sepolia!)';
+                    } else {
+                        info['Network'] = `⚠️ Unknown (${info['MetaMask Chain ID']})`;
+                    }
+                } catch (e) {
+                    info['MetaMask'] = '❌ Error: ' + e.message;
+                }
+            } else {
+                info['MetaMask'] = '❌ Not detected';
+            }
+
+            const sysinfoDiv = document.getElementById('sysinfo');
+            sysinfoDiv.innerHTML = Object.entries(info).map(([key, value]) => 
+                `<div class="test-item"><div>${key}</div><div class="metric">${value}</div></div>`
+            ).join('');
+
+            log('System info collected');
+        }
+
+        async function runFullDiagnostic() {
+            log('========================================');
+            log('Starting full diagnostic...');
+            log('========================================');
+            
+            testResults = {};
+            updateTestDisplay();
+            updateProgress(0, 'Starting...');
+
+            // Step 1: System info
+            await checkSystemInfo();
+            updateProgress(10, 'System info collected');
+
+            // Step 2: CDN test
+            const cdnOk = await testCDN();
+            if (!cdnOk) {
+                log('⚠️ CDN test failed, stopping diagnostic');
+                updateProgress(100, '❌ Diagnostic failed at CDN test');
+                return;
+            }
+
+            // Step 3: Load SDK
+            const sdkLoaded = await loadSDK();
+            if (!sdkLoaded) {
+                log('⚠️ SDK load failed, stopping diagnostic');
+                updateProgress(100, '❌ Diagnostic failed at SDK load');
+                return;
+            }
+
+            // Step 4: Initialize SDK
+            const sdkInited = await initSDK();
+            if (!sdkInited) {
+                log('⚠️ SDK initialization failed');
+                updateProgress(100, '⚠️ Diagnostic completed with errors');
+                return;
+            }
+
+            updateProgress(100, '✅ All tests passed!');
+            log('========================================');
+            log('✅ Diagnostic complete: All tests passed!');
+            log('========================================');
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            log('Page loaded, collecting system info...');
+            checkSystemInfo();
+        });
+    </script>
+</body>
+</html>
+
