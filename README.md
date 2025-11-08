@@ -2,6 +2,11 @@
 
 An encrypted dice lottery game built with [Zama's FHEVM](https://docs.zama.ai/fhevm) (Fully Homomorphic Encryption Virtual Machine), demonstrating privacy-preserving smart contracts on Ethereum.
 
+## 🎬 Live Demo
+
+- **🌐 Vercel Deployment**: [https://lucky-blond-kappa.vercel.app/](https://lucky-blond-kappa.vercel.app/)
+- **📹 Video Demo**: [Watch Demo Video](./lucky.mp4)
+
 ## 🌟 Features
 
 - 🔒 **Fully Encrypted Dice Rolls**: Your dice choices are encrypted on-chain using FHEVM
@@ -27,6 +32,157 @@ An encrypted dice lottery game built with [Zama's FHEVM](https://docs.zama.ai/fh
 - Pot resets and a new round begins
 - All operations happen on encrypted data
 
+## 🔐 Core Encryption Logic
+
+### Contract Architecture (`LuckyDice.sol`)
+
+The Lucky Dice contract leverages FHEVM to perform all operations on encrypted data:
+
+```solidity
+contract LuckyDice is SepoliaConfig {
+    uint64 public constant JACKPOT_THRESHOLD = 18;
+    
+    struct Roll {
+        address player;
+        euint8 encryptedRoll;      // Encrypted dice value (1-6)
+        euint64 sumAfterRoll;      // Encrypted sum after this roll
+        ebool hitJackpot;          // Encrypted jackpot flag
+        uint64 createdAt;
+    }
+    
+    euint64 private _rollingPot;   // Encrypted rolling sum
+}
+```
+
+### Key Encryption/Decryption Workflow
+
+#### 1. **Client-Side Encryption** (Frontend)
+
+```typescript
+// User selects dice value (1-6)
+const diceValue = 5;
+
+// Encrypt using FHEVM SDK
+const { handles, proof } = await fhevm.encrypt_euint8(diceValue);
+
+// Submit encrypted data to contract
+await contract.submitRoll(handles[0], proof);
+```
+
+**Key Points:**
+- Encryption happens **in the browser** using FHEVM SDK
+- Only encrypted ciphertext is sent to the blockchain
+- Original value never leaves the user's device in cleartext
+
+#### 2. **On-Chain Homomorphic Operations** (Smart Contract)
+
+```solidity
+function submitRoll(
+    externalEuint8 rollHandle,
+    bytes calldata rollProof
+) external returns (uint256 rollId) {
+    // Convert external handle to internal encrypted type
+    euint8 rollValue = FHE.fromExternal(rollHandle, rollProof);
+    
+    // Cast to euint64 for aggregation
+    euint64 rollAs64 = FHE.asEuint64(rollValue);
+    
+    // Homomorphic addition (works on encrypted data!)
+    euint64 updatedSum = FHE.add(_rollingPot, rollAs64);
+    
+    // Homomorphic comparison for jackpot detection
+    euint64 threshold = FHE.asEuint64(JACKPOT_THRESHOLD);
+    ebool hasJackpot = FHE.ge(updatedSum, threshold);  // updatedSum >= 18
+    
+    // Conditional pot reset using homomorphic operations
+    euint64 winnerMask = FHE.asEuint64(hasJackpot);
+    euint64 deduction = FHE.mul(threshold, winnerMask);
+    euint64 normalizedPot = FHE.sub(updatedSum, deduction);
+    
+    // Update state with encrypted values
+    _rollingPot = normalizedPot;
+    
+    // Store encrypted roll data
+    Roll storage entry = _rolls[rollId];
+    entry.encryptedRoll = rollValue;
+    entry.sumAfterRoll = updatedSum;
+    entry.hitJackpot = hasJackpot;
+}
+```
+
+**Key Points:**
+- All arithmetic happens on **encrypted data** using homomorphic operations
+- `FHE.add()`, `FHE.ge()`, `FHE.mul()`, `FHE.sub()` work without decryption
+- Contract logic executes without seeing actual dice values
+- Jackpot detection is done **homomorphically** - no cleartext comparison needed
+
+#### 3. **Selective Decryption** (Access Control)
+
+```solidity
+function getEncryptedRoll(uint256 rollId, address account) 
+    public view returns (euint8, euint64, ebool) 
+{
+    if (!_rollViewers[rollId][account]) {
+        revert NotAuthorized(account);
+    }
+    Roll storage entry = _rolls[rollId];
+    return (entry.encryptedRoll, entry.sumAfterRoll, entry.hitJackpot);
+}
+```
+
+**Key Points:**
+- Returns **still-encrypted** handles to authorized viewers
+- Access control via `_rollViewers` mapping
+- Only the **player** and **gameMaster** can access roll data
+
+#### 4. **Client-Side Decryption** (Frontend)
+
+```typescript
+// Request encrypted handles from contract
+const { encryptedRoll, sumAfterRoll, hitJackpot } = 
+    await contract.getEncryptedRoll(rollId, userAddress);
+
+// Decrypt using FHEVM SDK
+const diceValue = await fhevm.decrypt(encryptedRoll);
+const totalSum = await fhevm.decrypt(sumAfterRoll);
+const isJackpot = await fhevm.decrypt(hitJackpot);
+
+console.log(`Your roll: ${diceValue}`);
+console.log(`Total sum: ${totalSum}`);
+console.log(`Jackpot: ${isJackpot ? 'YES!' : 'No'}`);
+```
+
+**Key Points:**
+- Decryption requires **authorization** from the contract
+- Happens on client side using FHEVM RelayerSDK
+- Only authorized addresses can decrypt data
+
+### Privacy Guarantees
+
+| Data | On-Chain State | Who Can Decrypt |
+|------|----------------|-----------------|
+| Dice Roll Value (1-6) | ✅ Encrypted (`euint8`) | Player + GameMaster |
+| Rolling Pot Sum | ✅ Encrypted (`euint64`) | Authorized viewers |
+| Jackpot Flag | ✅ Encrypted (`ebool`) | Player + GameMaster |
+| Player Address | ⚠️ Public | Everyone |
+| Timestamp | ⚠️ Public | Everyone |
+| Roll Count | ⚠️ Public | Everyone |
+
+### Homomorphic Operation Examples
+
+```solidity
+// Example: Adding two encrypted numbers
+euint8 a = FHE.asEuint8(5);  // Encrypted 5
+euint8 b = FHE.asEuint8(3);  // Encrypted 3
+euint8 c = FHE.add(a, b);    // Encrypted 8 (computed without decryption!)
+
+// Example: Comparing encrypted values
+ebool isGreater = FHE.ge(c, FHE.asEuint8(7));  // Encrypted "true"
+
+// Example: Conditional selection
+euint8 result = FHE.select(isGreater, a, b);   // Returns 'a' if true, 'b' if false
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -39,8 +195,8 @@ An encrypted dice lottery game built with [Zama's FHEVM](https://docs.zama.ai/fh
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/waeter469/lucky.git
-cd lucky
+git clone https://github.com/Eve6061/shadow-cipher-clash.git
+cd shadow-cipher-clash/lucky
 ```
 
 2. **Install dependencies**
@@ -243,14 +399,14 @@ This project is licensed under the BSD-3-Clause-Clear License - see the [LICENSE
 
 ## 📞 Support
 
-- **Issues**: https://github.com/waeter469/lucky/issues
+- **GitHub**: https://github.com/Eve6061/shadow-cipher-clash
 - **Zama Docs**: https://docs.zama.ai/fhevm
 - **Zama Discord**: https://discord.com/invite/fhe-org
 
 ## 🎲 Try It Now!
 
-Visit our live demo (when deployed) or run locally to experience encrypted lottery gaming with FHEVM!
+Visit our **live demo at [https://lucky-blond-kappa.vercel.app/](https://lucky-blond-kappa.vercel.app/)** to experience encrypted lottery gaming with FHEVM!
 
 ---
 
-**Built with ❤️ and 🔐 by waeter469**
+**Built with ❤️ and 🔐 using Zama FHEVM**
