@@ -328,16 +328,6 @@ npm run genabi
 - **Styling**: Tailwind CSS
 - **Development**: Hardhat + TypeChain
 
-## 📖 Documentation
-
-Comprehensive guides available (in Chinese):
-
-- [本地运行指南.md](./本地运行指南.md) - Local setup guide
-- [MetaMask配置指南.md](./MetaMask配置指南.md) - MetaMask configuration
-- [Sepolia测试网使用指南.md](./Sepolia测试网使用指南.md) - Sepolia testnet guide
-- [如何导入测试账户到MetaMask.md](./如何导入测试账户到MetaMask.md) - Import test accounts
-- [切换到本地网络.md](./切换到本地网络.md) - Switch networks guide
-
 ## 🔒 Security & Privacy
 
 ### What's Encrypted?
