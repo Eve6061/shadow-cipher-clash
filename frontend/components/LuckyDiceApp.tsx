@@ -79,6 +79,8 @@ export function LuckyDiceApp() {
 
   const [diceValue, setDiceValue] = useState<string>("4");
   const [rollLookup, setRollLookup] = useState<string>("");
+  const [batchRolls, setBatchRolls] = useState<string[]>(["4", "2", "6"]);
+  const [isBatchMode, setIsBatchMode] = useState(false);
 
   useEffect(() => {
     if (dice.isDeployed) {
@@ -93,7 +95,15 @@ export function LuckyDiceApp() {
   const submitDisabled =
     !wagmiConnected || !canEncrypt || dice.isSubmitting || !diceValue || Number(diceValue) < 1 || Number(diceValue) > 6;
 
-  const activeStatus = dice.status;
+  const activeStatus =
+    dice.status ||
+    (fhevmStatus === "error" && fhevmError
+      ? fhevmError.message
+      : fhevmStatus === "ready"
+      ? "FHEVM ready."
+      : fhevmStatus === "loading"
+      ? "Connecting to FHEVM runtime..."
+      : "");
 
   const relayerHelp =
     fhevmStatus === "error" && fhevmError?.message?.includes("relayerSDK")
