@@ -12,9 +12,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const deployedLuckyDice = await deploy("LuckyDice", {
     from: deployer,
     log: true,
+    waitConfirmations: 1,
   });
 
-  // Missing wait for deployment confirmation
   console.log(`LuckyDice contract: `, deployedLuckyDice.address);
 };
 export default func;
