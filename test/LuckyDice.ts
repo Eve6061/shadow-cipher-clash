@@ -94,6 +94,53 @@ describe("LuckyDice", function () {
     });
   });
 
+  describe("Batch Operations", function () {
+    it("Should handle multiple roll submissions in batch", async function () {
+      const rolls = [3, 5, 2];
+      const rollIds = await submitBatchRolls(rolls);
+
+      expect(rollIds.length).to.equal(3);
+      expect(await luckyDice.rollCount()).to.equal(3);
+    });
+
+    it("Should reject invalid batch sizes", async function () {
+      await expect(submitBatchRolls([])).to.be.revertedWith("Invalid number of rolls");
+
+      const tooManyRolls = new Array(11).fill(1);
+      await expect(submitBatchRolls(tooManyRolls)).to.be.revertedWith("Invalid number of rolls");
+    });
+
+    it("Should provide lottery statistics", async function () {
+      await submitRoll(4);
+
+      const [totalRolls, potValue] = await luckyDice.getLotteryStats();
+      expect(totalRolls).to.equal(1);
+      // potValue would be encrypted in real FHE implementation
+    });
+  });
+
+  describe("Edge Cases", function () {
+    it("Should handle maximum valid dice values", async function () {
+      await submitRoll(6); // Maximum valid value
+      expect(await luckyDice.rollCount()).to.equal(1);
+    });
+
+    it("Should handle minimum valid dice values", async function () {
+      await submitRoll(1); // Minimum valid value
+      expect(await luckyDice.rollCount()).to.equal(1);
+    });
+
+    it("Should maintain state across multiple players", async function () {
+      await submitRoll(3); // Alice rolls
+      await luckyDice.connect(signers.bob).submitRoll(
+        ethers.toBeHex(4),
+        "0x" + "00".repeat(32)
+      ); // Bob rolls
+
+      expect(await luckyDice.rollCount()).to.equal(2);
+    });
+  });
+
   async function submitRoll(value: number): Promise<bigint> {
     // In a real FHE setup, this would encrypt the value
     // For testing, we'll use a mock implementation
