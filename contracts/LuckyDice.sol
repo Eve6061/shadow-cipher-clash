@@ -147,6 +147,83 @@ contract LuckyDice is SepoliaConfig {
         return _rollingPot;
     }
 
+    /// @notice Submit multiple dice rolls in a single transaction for efficiency.
+    /// @param rollHandles Array of ciphertext handles for dice values (1-6).
+    /// @param rollProofs Array of proofs validating the ciphertext integrity.
+    /// @return rollIds Array of unique identifiers for the recorded roll entries.
+    function submitMultipleRolls(
+        externalEuint8[] calldata rollHandles,
+        bytes[] calldata rollProofs
+    ) external returns (uint256[] memory rollIds) {
+        require(rollHandles.length == rollProofs.length, "Mismatched array lengths");
+        require(rollHandles.length > 0 && rollHandles.length <= 10, "Invalid number of rolls");
+
+        rollIds = new uint256[](rollHandles.length);
+
+        for (uint256 i = 0; i < rollHandles.length; i++) {
+            rollIds[i] = _submitSingleRoll(rollHandles[i], rollProofs[i]);
+        }
+    }
+
+    /// @notice Get statistics about the current lottery state.
+    /// @return totalRolls Total number of rolls submitted.
+    /// @return potValue Current encrypted pot value (requires decryption).
+    function getLotteryStats() external view returns (uint256 totalRolls, euint64 potValue) {
+        return (rollCount, _rollingPot);
+    }
+
+    /// @dev Internal function to handle single roll submission logic.
+    function _submitSingleRoll(
+        externalEuint8 rollHandle,
+        bytes calldata rollProof
+    ) private returns (uint256 rollId) {
+        euint8 rollValue = FHE.fromExternal(rollHandle, rollProof);
+        euint64 rollAs64 = FHE.asEuint64(rollValue);
+
+        // Initialize _rollingPot to zero if this is the first roll
+        if (rollCount == 0) {
+            _rollingPot = FHE.asEuint64(0);
+            FHE.allowThis(_rollingPot);
+        }
+
+        euint64 updatedSum = FHE.add(_rollingPot, rollAs64);
+
+        euint64 threshold = FHE.asEuint64(JACKPOT_THRESHOLD);
+        ebool hasJackpot = FHE.ge(updatedSum, threshold);
+
+        euint64 winnerMask = FHE.asEuint64(hasJackpot);
+        euint64 deduction = FHE.mul(threshold, winnerMask);
+        euint64 normalizedPot = FHE.sub(updatedSum, deduction);
+
+        _rollingPot = normalizedPot;
+        _allowPotForContract();
+        _allowPot(gameMaster);
+
+        rollId = ++rollCount;
+        Roll storage entry = _rolls[rollId];
+        entry.player = msg.sender;
+        entry.encryptedRoll = rollValue;
+        entry.sumAfterRoll = updatedSum;
+        entry.hitJackpot = hasJackpot;
+        entry.createdAt = uint64(block.timestamp);
+
+        // Allow contract to manage these handles
+        FHE.allowThis(rollValue);
+        FHE.allowThis(updatedSum);
+        FHE.allowThis(hasJackpot);
+
+        _grantRollViewer(rollId, msg.sender);
+        _allowRoll(entry, msg.sender);
+
+        _potViewers[msg.sender] = true;
+        _allowPot(msg.sender);
+
+        _grantRollViewer(rollId, gameMaster);
+        _allowRoll(entry, gameMaster);
+
+        emit RollSubmitted(rollId, msg.sender);
+    }
+
     /// @notice Grants pot viewing ability to another address.
     /// @param viewer Address to authorize.
     function allowPotViewer(address viewer) external {
