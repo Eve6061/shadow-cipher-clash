@@ -153,4 +153,14 @@ describe("LuckyDice", function () {
     // Extract rollId from event (simplified)
     return 1n; // Mock return for testing
   }
+
+  async function submitBatchRolls(values: number[]): Promise<bigint[]> {
+    // Mock batch submission for testing
+    const results: bigint[] = [];
+    for (let i = 0; i < values.length; i++) {
+      const rollId = await submitRoll(values[i]);
+      results.push(rollId + BigInt(i)); // Simulate different IDs
+    }
+    return results;
+  }
 });
