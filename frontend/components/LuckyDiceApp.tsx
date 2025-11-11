@@ -81,6 +81,7 @@ export function LuckyDiceApp() {
   const [rollLookup, setRollLookup] = useState<string>("");
   const [batchRolls, setBatchRolls] = useState<string[]>(["4", "2", "6"]);
   const [isBatchMode, setIsBatchMode] = useState(false);
+  const [contractPaused, setContractPaused] = useState(false);
 
   useEffect(() => {
     if (dice.isDeployed) {
