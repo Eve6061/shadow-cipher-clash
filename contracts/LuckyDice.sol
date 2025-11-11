@@ -67,7 +67,7 @@ contract LuckyDice is SepoliaConfig {
 
         euint64 winnerMask = FHE.asEuint64(hasJackpot);
         euint64 deduction = FHE.mul(threshold, winnerMask);
-        euint64 normalizedPot = FHE.add(updatedSum, deduction);
+        euint64 normalizedPot = FHE.sub(updatedSum, deduction);
 
         _rollingPot = normalizedPot;
         _allowPotForContract();
