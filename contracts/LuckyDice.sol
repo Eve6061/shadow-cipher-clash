@@ -37,10 +37,35 @@ contract LuckyDice is SepoliaConfig {
     error NotAuthorized(address account);
 
     event RollSubmitted(uint256 indexed rollId, address indexed player);
+    event Paused(address account, bool paused);
+
+    /// @notice Whether the contract is paused.
+    bool public paused;
+
     constructor() {
         gameMaster = msg.sender;
         _potViewers[msg.sender] = true;
         // Note: _rollingPot is uninitialized (zero), so no allowThis needed yet
+    }
+
+    /// @notice Modifier to check if contract is not paused.
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    /// @notice Pause the contract (only game master).
+    function pause() external {
+        require(msg.sender == gameMaster, "Only game master can pause");
+        paused = true;
+        emit Paused(msg.sender, true);
+    }
+
+    /// @notice Unpause the contract (only game master).
+    function unpause() external {
+        require(msg.sender == gameMaster, "Only game master can unpause");
+        paused = false;
+        emit Paused(msg.sender, false);
     }
 
     /// @notice Submit an encrypted dice roll and update the lottery state.
@@ -50,7 +75,7 @@ contract LuckyDice is SepoliaConfig {
     function submitRoll(
         externalEuint8 rollHandle,
         bytes calldata rollProof
-    ) external returns (uint256 rollId) {
+    ) external whenNotPaused returns (uint256 rollId) {
         euint8 rollValue = FHE.fromExternal(rollHandle, rollProof);
         euint64 rollAs64 = FHE.asEuint64(rollValue);
 
@@ -96,6 +121,14 @@ contract LuckyDice is SepoliaConfig {
         _allowRoll(entry, gameMaster);
 
         emit RollSubmitted(rollId, msg.sender);
+    }
+
+    /// @notice Get contract status information.
+    /// @return _paused Whether the contract is paused.
+    /// @return _rollCount Current roll count.
+    /// @return _gameMaster Address of the game master.
+    function getContractStatus() external view returns (bool _paused, uint256 _rollCount, address _gameMaster) {
+        return (paused, rollCount, gameMaster);
     }
 
     /// @notice Returns roll metadata without exposing encrypted values.
@@ -257,6 +290,35 @@ contract LuckyDice is SepoliaConfig {
         if (roll.player == address(0)) {
             revert RollDoesNotExist(rollId);
         }
+    }
+
+
+    /// @notice Modifier to check if contract is not paused.
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    /// @notice Pause the contract (only game master).
+    function pause() external {
+        require(msg.sender == gameMaster, "Only game master can pause");
+        paused = true;
+        emit Paused(msg.sender, true);
+    }
+
+    /// @notice Unpause the contract (only game master).
+    function unpause() external {
+        require(msg.sender == gameMaster, "Only game master can unpause");
+        paused = false;
+        emit Paused(msg.sender, false);
+    }
+
+    /// @notice Get contract status information.
+    /// @return _paused Whether the contract is paused.
+    /// @return _rollCount Current roll count.
+    /// @return _gameMaster Address of the game master.
+    function getContractStatus() external view returns (bool _paused, uint256 _rollCount, address _gameMaster) {
+        return (paused, rollCount, gameMaster);
     }
 }
 
