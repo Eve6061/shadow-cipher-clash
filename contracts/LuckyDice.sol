@@ -15,6 +15,9 @@ import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 /// @dev Demonstrates encrypted submissions, homomorphic aggregation, and private jackpot evaluation on-chain.
 contract LuckyDice is SepoliaConfig {
     uint64 public constant JACKPOT_THRESHOLD = 18;
+    uint8 public constant MAX_DICE_VALUE = 6;
+    uint8 public constant MIN_DICE_VALUE = 1;
+    uint8 public constant MAX_BATCH_SIZE = 10;
 
     struct Roll {
         address player;
@@ -189,7 +192,7 @@ contract LuckyDice is SepoliaConfig {
         bytes[] calldata rollProofs
     ) external returns (uint256[] memory rollIds) {
         require(rollHandles.length == rollProofs.length, "Mismatched array lengths");
-        require(rollHandles.length > 0 && rollHandles.length <= 10, "Invalid number of rolls");
+        require(rollHandles.length > 0 && rollHandles.length <= MAX_BATCH_SIZE, "Invalid number of rolls");
 
         rollIds = new uint256[](rollHandles.length);
 
