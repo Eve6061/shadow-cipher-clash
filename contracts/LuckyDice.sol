@@ -109,6 +109,24 @@ contract LuckyDice is SepoliaConfig {
         return (roll.player, roll.createdAt);
     }
 
+    /// @notice Returns encrypted roll details for authorized viewers.
+    /// @param rollId Identifier returned by `submitRoll`.
+    /// @return encryptedRoll Ciphertext of the submitted dice value.
+    /// @return cumulativeSum Ciphertext representing the cumulative sum after this roll.
+    /// @return hitJackpot Ciphertext flag indicating whether the threshold was reached.
+    function getEncryptedRollDetails(
+        uint256 rollId
+    )
+        external
+        view
+        returns (euint8 encryptedRoll, euint64 cumulativeSum, ebool hitJackpot)
+    {
+        Roll storage roll = _requireRoll(rollId);
+        if (!_rollViewers[rollId][msg.sender]) {
+            revert NotAuthorized(msg.sender);
+        }
+        return (roll.encryptedRoll, roll.sumAfterRoll, roll.hitJackpot);
+    }
 
     /// @notice Allows the roll owner or game master to grant decrypt permissions.
     /// @param rollId Identifier returned by `submitRoll`.
