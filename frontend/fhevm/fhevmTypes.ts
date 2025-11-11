@@ -3,8 +3,13 @@ import type { FhevmInstanceConfig } from "@zama-fhe/relayer-sdk/web";
 import type { HandleContractPair } from "@zama-fhe/relayer-sdk/bundle";
 import type { DecryptedResults } from "@zama-fhe/relayer-sdk/bundle";
 
-// Missing proper error types
 export type { FhevmInstance, FhevmInstanceConfig, HandleContractPair, DecryptedResults };
+
+export type FhevmError = {
+  code: string;
+  message: string;
+  details?: any;
+};
 
 export type FhevmDecryptionSignatureType = {
   publicKey: string;
