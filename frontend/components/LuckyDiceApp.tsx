@@ -172,6 +172,24 @@ export function LuckyDiceApp() {
         </div>
       ) : null}
 
+      <section className="glass-surface p-6">
+        <h2 className="text-xl font-semibold text-white">Lottery Statistics</h2>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+            <p className="text-sm text-slate-400">Total Rolls</p>
+            <p className="text-2xl font-semibold text-white">{dice.rollCount?.toString() || "0"}</p>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+            <p className="text-sm text-slate-400">Jackpot Threshold</p>
+            <p className="text-2xl font-semibold text-white">18</p>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+            <p className="text-sm text-slate-400">Active Players</p>
+            <p className="text-2xl font-semibold text-white">--</p>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-6 lg:grid-cols-[3fr_2fr]">
         <div className="glass-surface p-6">
           <h2 className="text-xl font-semibold text-white">Submit encrypted roll</h2>
