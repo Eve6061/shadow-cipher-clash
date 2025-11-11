@@ -141,6 +141,45 @@ describe("LuckyDice", function () {
     });
   });
 
+  describe("Emergency Controls", function () {
+    it("Should allow game master to pause and unpause contract", async function () {
+      // Initially not paused
+      expect(await luckyDice.paused()).to.be.false;
+
+      // Pause by game master
+      await luckyDice.connect(signers.deployer).pause();
+      expect(await luckyDice.paused()).to.be.true;
+
+      // Unpause by game master
+      await luckyDice.connect(signers.deployer).unpause();
+      expect(await luckyDice.paused()).to.be.false;
+    });
+
+    it("Should prevent non-game-master from pausing", async function () {
+      await expect(luckyDice.connect(signers.alice).pause())
+        .to.be.revertedWith("Only game master can pause");
+    });
+
+    it("Should block roll submissions when paused", async function () {
+      await luckyDice.connect(signers.deployer).pause();
+
+      await expect(submitRoll(3)).to.be.revertedWith("Contract is paused");
+
+      // Unpause and verify it works again
+      await luckyDice.connect(signers.deployer).unpause();
+      await submitRoll(3);
+      expect(await luckyDice.rollCount()).to.equal(1);
+    });
+
+    it("Should provide contract status information", async function () {
+      const [paused, rollCount, gameMaster] = await luckyDice.getContractStatus();
+
+      expect(paused).to.be.false;
+      expect(rollCount).to.equal(0);
+      expect(gameMaster).to.equal(signers.deployer.address);
+    });
+  });
+
   async function submitRoll(value: number): Promise<bigint> {
     // In a real FHE setup, this would encrypt the value
     // For testing, we'll use a mock implementation
